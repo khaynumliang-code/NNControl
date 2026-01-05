@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>牛牛电子路单 - 独立账号版</title>
+    <style>
+        :root {
+            --bg-page: #ffffff; 
+            --header-red: #d32f2f;
+            --win-red: linear-gradient(to bottom, #cf3535 0%, #a61a1a 45%, #7a0000 100%);
+            --lose-blue: linear-gradient(to bottom, #4477cc 0%, #2255aa 45%, #002277 100%);
+            --banker-gold: linear-gradient(to bottom, #ffd700 0%, #daa520 100%);
+        }
+        body { margin: 0; background-color: var(--bg-page); font-family: "Microsoft YaHei", sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        .top-bar { background-color: var(--header-red); color: white; display: flex; justify-content: space-between; align-items: center; padding: 0 50px; height: 150px; flex-shrink: 0; z-index: 10; }
+        .top-bar-left { flex: 1; font-size: 80px; font-weight: 900; }
+        .top-bar-center { flex: 2; text-align: center; font-size: 50px; font-weight: bold; }
+        .top-bar-right { flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
+        
+        /* 按钮样式 */
+        .btn { background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white; padding: 12px 25px; font-size: 24px; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        .btn:hover { background: rgba(255, 255, 255, 0.4); }
+        .change-shoe-btn { background: #ffeb3b; color: #000; border-color: #fdd835; font-weight: bold; }
+        .change-shoe-btn:hover { background: #fdd835; }
+
+        .main-container { flex: 1; display: flex; overflow: hidden; }
+        .sidebar-left { width: 180px; background-color: #900000; border-right: 4px solid #ffd700; flex-shrink: 0; }
+        .content-right { flex: 1; padding: 20px; overflow-x: auto; overflow-y: hidden; background-color: #ffffff; display: flex; flex-direction: column; }
+        
+        .scoreboard { 
+            display: grid; 
+            flex: 1;
+            grid-template-columns: 100px repeat(120, 120px); 
+            grid-template-rows: 60px repeat(7, 1fr); 
+            gap: 10px;
+            min-width: max-content;
+        }
+
+        .cell { display: flex; justify-content: center; align-items: center; font-size: 28px; font-weight: bold; color: white; border-radius: 10px; box-shadow: 0 5px 10px rgba(0,0,0,0.2); border: 4px solid transparent; text-shadow: 1px 1px 3px rgba(0,0,0,0.6); }
+        .empty-cell { background-color: #f5f5f5; color: #ccc; text-shadow: none; border: 1px solid #eee; }
+        .banker-style { background: var(--banker-gold); color: #442200; text-shadow: none; }
+        .win-style { background: var(--win-red); }
+        .lose-style { background: var(--lose-blue); }
+        .active-focus { border: 6px solid #00FF00 !important; box-shadow: 0 0 25px #00FF00; transform: scale(1.02); z-index: 10; }
+
+        .header-cell { background-color: #f5f5f5; color: #333; font-size: 24px; border: 1px solid #eee; text-shadow: none; }
+        .label-cell { background-color: #ffffff; color: #333; text-shadow: none; border: 1px solid #ddd; font-size: 32px; position: sticky; left: 0; z-index: 2; }
+        .label-banker { color: #d32f2f; border-left: 10px solid #d32f2f; }
+        .label-player { color: #1565c0; border-left: 10px solid #1565c0; }
+
+        .footer { background: var(--header-red); height: 80px; border-top: 2px solid rgba(0,0,0,0.2); flex-shrink: 0; display: flex; justify-content: center; align-items: center; color: #ffd700; font-size: 30px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <div class="top-bar-left" id="dynamic-title">牛牛</div>
+    <div class="top-bar-center">限红: <span id="limit-display">20 - 50,000</span></div>
+    <div class="top-bar-right">
+        <button class="btn change-shoe-btn" onclick="changeShoe()">换靴</button>
+        <button class="btn" onclick="updateLimit()">修改限红</button>
+    </div>
+</div>
+
+<div class="main-container">
+    <div class="sidebar-left"></div>
+    <div class="content-right" id="scroll-wrapper">
+        <div class="scoreboard" id="board">
+            <div class="cell header-cell label-cell" style="position: sticky; left: 0; z-index: 3;">局数</div>
+        </div>
+    </div>
+</div>
+
+<div class="footer">
+    炸弹 > 五花牛 > 牛牛 > 牛9 > 牛8 > 牛7 > 牛6 > 牛5 > 牛4 > 牛3 > 牛2 > 牛1 > 无牛
+</div>
+
+<script>
+    const CURRENT_USER = localStorage.getItem("nn_current_user") || "C1";
+    const DISPLAY_NAME = CURRENT_USER.replace('C', '牛牛 ');
+
+    let curRow = 0; 
+    let curCol = 0; 
+    let colorMode = ""; 
+
+    window.onload = function() {
+        document.getElementById('dynamic-title').innerText = DISPLAY_NAME;
+        const savedLimit = localStorage.getItem(`${CURRENT_USER}_limit`);
+        if (savedLimit) document.getElementById('limit-display').innerText = savedLimit;
+
+        initBoard();      
+        loadUserGrid();   
+        updateFocus();    
+    };
+
+    function initBoard() {
+        const board = document.getElementById('board');
+        for (let i = 1; i <= 120; i++) {
+            const div = document.createElement('div');
+            div.className = 'cell header-cell';
+            div.innerText = i;
+            board.appendChild(div);
+        }
+
+        const rows = ["庄", "闲1", "闲2", "闲3", "闲4", "闲5", "闲6"];
+        rows.forEach((name, rIndex) => {
+            const label = document.createElement('div');
+            label.className = `cell label-cell ${rIndex === 0 ? 'label-banker' : 'label-player'}`;
+            label.innerText = name;
+            board.appendChild(label);
+
+            for (let cIndex = 0; cIndex < 120; cIndex++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell empty-cell';
+                cell.id = `cell-${rIndex}-${cIndex}`;
+                board.appendChild(cell);
+            }
+        });
+    }
+
+    // 换靴功能：清空所有路单格子，不影响限红
+    function changeShoe() {
+        if (confirm("确定要换靴吗？这将清空当前账号的所有录入数据！")) {
+            // 1. 遍历并删除 localStorage 中属于当前用户的格子数据
+            for (let r = 0; r < 7; r++) {
+                for (let c = 0; c < 120; c++) {
+                    localStorage.removeItem(`${CURRENT_USER}_grid_${r}_${c}`);
+                    
+                    // 2. 清空网页上的显示
+                    const cell = document.getElementById(`cell-${r}-${c}`);
+                    if (cell) {
+                        cell.innerText = "";
+                        cell.className = "cell empty-cell";
+                    }
+                }
+            }
+            // 3. 重置光标到第一局庄家
+            curRow = 0;
+            curCol = 0;
+            updateFocus();
+            alert("数据已清空，新靴开始！");
+        }
+    }
+
+    function saveCell(r, c, text, cls) {
+        const dataKey = `${CURRENT_USER}_grid_${r}_${c}`; 
+        localStorage.setItem(dataKey, JSON.stringify({ text: text, className: cls }));
+    }
+
+    function loadUserGrid() {
+        for (let r = 0; r < 7; r++) {
+            for (let c = 0; c < 120; c++) {
+                const dataKey = `${CURRENT_USER}_grid_${r}_${c}`;
+                const saved = localStorage.getItem(dataKey);
+                if (saved) {
+                    const item = JSON.parse(saved);
+                    const dom = document.getElementById(`cell-${r}-${c}`);
+                    if (dom) {
+                        dom.innerText = item.text;
+                        dom.className = item.className;
+                    }
+                }
+            }
+        }
+    }
+
+    function updateFocus() {
+        document.querySelectorAll('.cell').forEach(c => c.classList.remove('active-focus'));
+        const target = document.getElementById(`cell-${curRow}-${curCol}`);
+        if (target) {
+            target.classList.add('active-focus');
+            target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    }
+
+    document.addEventListener('keydown', function(e) {
+        const cell = document.getElementById(`cell-${curRow}-${curCol}`);
+        if (!cell) return;
+
+        if (e.key === '+') { colorMode = "red"; return; }
+        if (e.key === '-') { colorMode = "blue"; return; }
+
+        let text = "";
+        let isBomb = false;
+
+        if (e.key >= '1' && e.key <= '9') text = "牛" + e.key;
+        else if (e.key === '0') text = "无牛";
+        else if (e.key === '/') text = "五花牛";
+        else if (e.key === '*') { text = "炸弹"; isBomb = true; }
+
+        if (text !== "") {
+            cell.innerText = text;
+            let finalCls = "";
+            if (curRow === 0) {
+                finalCls = "cell banker-style";
+            } else {
+                if (isBomb || colorMode === "red") finalCls = "cell win-style";
+                else finalCls = "cell lose-style";
+            }
+            cell.className = finalCls;
+            saveCell(curRow, curCol, text, finalCls);
+            colorMode = ""; 
+            updateFocus();
+        }
+
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            curRow++;
+            if (curRow > 6) { curRow = 0; curCol++; }
+            updateFocus();
+        }
+
+        if (e.key === 'Backspace') {
+            e.preventDefault();
+            cell.innerText = "";
+            cell.className = "cell empty-cell";
+            localStorage.removeItem(`${CURRENT_USER}_grid_${curRow}_${curCol}`);
+            curRow--;
+            if (curRow < 0 && curCol > 0) { curRow = 6; curCol--; }
+            else if (curRow < 0) curRow = 0;
+            updateFocus();
+        }
+    });
+
+    function updateLimit() {
+        const display = document.getElementById('limit-display');
+        const newVal = prompt("设置此账号限红：", display.innerText);
+        if (newVal) {
+            display.innerText = newVal;
+            localStorage.setItem(`${CURRENT_USER}_limit`, newVal);
+        }
+    }
+</script>
+</body>
+</html>
