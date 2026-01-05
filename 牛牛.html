@@ -42,7 +42,6 @@
         .win-style { background: var(--win-red); }
         .lose-style { background: var(--lose-blue); }
         
-        /* 选中时的强力高亮 */
         .active-focus { border: 6px solid #00FF00 !important; box-shadow: 0 0 25px #00FF00; transform: scale(1.05); z-index: 10; }
 
         .header-cell { background-color: #f5f5f5; color: #333; font-size: 24px; border: 1px solid #eee; text-shadow: none; cursor: default; }
@@ -97,7 +96,6 @@
 
     function initBoard() {
         const board = document.getElementById('board');
-        // 表头
         for (let i = 1; i <= 120; i++) {
             const div = document.createElement('div');
             div.className = 'cell header-cell';
@@ -117,7 +115,7 @@
                 cell.className = 'cell empty-cell';
                 cell.id = `cell-${rIndex}-${cIndex}`;
                 
-                // 【核心修改】点击任意格子直接跳转光标，方便修改
+                // 允许点击修改
                 cell.onclick = function() {
                     curRow = rIndex;
                     curCol = cIndex;
@@ -173,7 +171,6 @@
         const cell = document.getElementById(`cell-${curRow}-${curCol}`);
         if (!cell) return;
 
-        // 手动录入颜色
         if (e.key === '+') { colorMode = "red"; return; }
         if (e.key === '-') { colorMode = "blue"; return; }
 
@@ -191,7 +188,6 @@
             colorMode = ""; 
         }
 
-        // 回车跳格
         if (e.key === 'Enter') {
             e.preventDefault();
             curRow++;
@@ -199,12 +195,22 @@
             updateFocus();
         }
 
-        // 退格清空
+        // 恢复成：清空并回退到上一个格子
         if (e.key === 'Backspace') {
             e.preventDefault();
             cell.innerText = "";
-            cell.className = "cell empty-cell active-focus";
+            cell.className = "cell empty-cell";
             localStorage.removeItem(`${CURRENT_USER}_grid_${curRow}_${curCol}`);
+            
+            // 逻辑回退
+            curRow--;
+            if (curRow < 0 && curCol > 0) {
+                curRow = 6;
+                curCol--;
+            } else if (curRow < 0) {
+                curRow = 0;
+            }
+            updateFocus();
         }
     });
 
