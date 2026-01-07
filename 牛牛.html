@@ -115,7 +115,6 @@
                 cell.className = 'cell empty-cell';
                 cell.id = `cell-${rIndex}-${cIndex}`;
                 
-                // 允许点击修改
                 cell.onclick = function() {
                     curRow = rIndex;
                     curCol = cIndex;
@@ -179,10 +178,20 @@
         else if (e.key === '0') text = "无牛";
         else if (e.key === '/') text = "五花牛";
         else if (e.key === '*') { text = "炸弹"; isBomb = true; }
+        else if (e.key === '.') { text = "牛牛"; } // 这里新增了点号代表牛牛
 
         if (text !== "") {
             cell.innerText = text;
-            let finalCls = (curRow === 0) ? "cell banker-style" : (isBomb || colorMode === "red" ? "cell win-style" : "cell lose-style");
+            let finalCls = "";
+            
+            // 庄家行永远使用金色样式
+            if (curRow === 0) {
+                finalCls = "cell banker-style";
+            } else {
+                // 闲家行：如果是炸弹或者是按了+号录入，则为红色，否则默认为蓝色
+                finalCls = (isBomb || colorMode === "red") ? "cell win-style" : "cell lose-style";
+            }
+            
             cell.className = finalCls + " active-focus";
             saveCell(curRow, curCol, text, finalCls);
             colorMode = ""; 
@@ -195,14 +204,12 @@
             updateFocus();
         }
 
-        // 恢复成：清空并回退到上一个格子
         if (e.key === 'Backspace') {
             e.preventDefault();
             cell.innerText = "";
             cell.className = "cell empty-cell";
             localStorage.removeItem(`${CURRENT_USER}_grid_${curRow}_${curCol}`);
             
-            // 逻辑回退
             curRow--;
             if (curRow < 0 && curCol > 0) {
                 curRow = 6;
