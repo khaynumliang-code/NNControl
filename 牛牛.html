@@ -84,6 +84,13 @@
     let curCol = 0; 
     let colorMode = ""; 
 
+    // 点数权重定义
+    const RANK_MAP = {
+        "炸弹": 12, "五花牛": 11, "牛牛": 10, "牛9": 9, "牛8": 8, 
+        "牛7": 7, "牛6": 6, "牛5": 5, "牛4": 4, "牛3": 3, 
+        "牛2": 2, "牛1": 1, "无牛": 0
+    };
+
     window.onload = function() {
         document.getElementById('dynamic-title').innerText = DISPLAY_NAME;
         const savedLimit = localStorage.getItem(`${CURRENT_USER}_limit`);
@@ -173,23 +180,35 @@
         if (e.key === '+') { colorMode = "red"; return; }
         if (e.key === '-') { colorMode = "blue"; return; }
 
-        let text = ""; let isBomb = false;
+        let text = ""; 
         if (e.key >= '1' && e.key <= '9') text = "牛" + e.key;
         else if (e.key === '0') text = "无牛";
         else if (e.key === '/') text = "五花牛";
-        else if (e.key === '*') { text = "炸弹"; isBomb = true; }
-        else if (e.key === '.') { text = "牛牛"; } // 这里新增了点号代表牛牛
+        else if (e.key === '*') text = "炸弹";
+        else if (e.key === '.') text = "牛牛";
 
         if (text !== "") {
             cell.innerText = text;
             let finalCls = "";
             
-            // 庄家行永远使用金色样式
             if (curRow === 0) {
+                // 庄家永远金色
                 finalCls = "cell banker-style";
             } else {
-                // 闲家行：如果是炸弹或者是按了+号录入，则为红色，否则默认为蓝色
-                finalCls = (isBomb || colorMode === "red") ? "cell win-style" : "cell lose-style";
+                // 闲家自动对比庄家
+                const bankerCell = document.getElementById(`cell-0-${curCol}`);
+                const bankerText = bankerCell ? bankerCell.innerText : "";
+
+                if (colorMode === "red") {
+                    finalCls = "cell win-style";
+                } else if (colorMode === "blue") {
+                    finalCls = "cell lose-style";
+                } else if (bankerText && RANK_MAP[text] !== undefined && RANK_MAP[bankerText] !== undefined) {
+                    // 自动判断：闲 >= 庄 为红，否则为蓝
+                    finalCls = (RANK_MAP[text] >= RANK_MAP[bankerText]) ? "cell win-style" : "cell lose-style";
+                } else {
+                    finalCls = "cell lose-style"; // 默认或庄家未录入时
+                }
             }
             
             cell.className = finalCls + " active-focus";
